@@ -89,6 +89,38 @@ set_timezone() {
 }
 
 #===============================================================================
+# 模块3: 修改主机名
+#===============================================================================
+
+set_hostname() {
+    local current_hostname=$(hostname)
+    log "当前主机名: $current_hostname"
+
+    read -p "请输入新的主机名 (直接回车跳过): " new_hostname
+
+    if [[ -z "$new_hostname" ]]; then
+        log "跳过主机名修改"
+        return
+    fi
+
+    # 验证主机名格式
+    if [[ ! "$new_hostname" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$ ]]; then
+        error "主机名格式无效，只能包含字母、数字和连字符"
+        return 1
+    fi
+
+    hostnamectl set-hostname "$new_hostname"
+
+    # 更新 /etc/hosts
+    sed -i "s/127.0.1.1.*/127.0.1.1\t$new_hostname/" /etc/hosts
+    if ! grep -q "127.0.1.1" /etc/hosts; then
+        echo "127.0.1.1	$new_hostname" >> /etc/hosts
+    fi
+
+    log "主机名已修改为: $new_hostname"
+}
+
+#===============================================================================
 # 模块3: Swap 配置
 #===============================================================================
 
@@ -473,6 +505,9 @@ run_all() {
     set_timezone
     press_enter
 
+    set_hostname
+    press_enter
+
     configure_swap
     press_enter
 
@@ -512,14 +547,15 @@ show_menu() {
     echo "╠══════════════════════════════════════════════════════════════╣"
     echo "║  1. 更新系统软件包                                           ║"
     echo "║  2. 设置时区 (Asia/Shanghai)                                 ║"
-    echo "║  3. 配置 Swap                                                ║"
-    echo "║  4. 创建新用户 (sudo)                                        ║"
-    echo "║  5. SSH 安全配置 (端口/密钥认证)                             ║"
-    echo "║  6. 配置 UFW 防火墙                                          ║"
-    echo "║  7. 安装 Fail2ban                                            ║"
-    echo "║  8. 启用 BBR 网络优化                                        ║"
-    echo "║  9. 安装基础工具                                             ║"
-    echo "║ 10. 安装 Docker                                              ║"
+    echo "║  3. 修改主机名                                               ║"
+    echo "║  4. 配置 Swap                                                ║"
+    echo "║  5. 创建新用户 (sudo)                                        ║"
+    echo "║  6. SSH 安全配置 (端口/密钥认证)                             ║"
+    echo "║  7. 配置 UFW 防火墙                                          ║"
+    echo "║  8. 安装 Fail2ban                                            ║"
+    echo "║  9. 启用 BBR 网络优化                                        ║"
+    echo "║ 10. 安装基础工具                                             ║"
+    echo "║ 11. 安装 Docker                                              ║"
     echo "╠══════════════════════════════════════════════════════════════╣"
     echo "║  0. 一键执行全部配置                                         ║"
     echo "║  q. 退出                                                     ║"
@@ -536,19 +572,20 @@ main() {
 
     while true; do
         show_menu
-        read -p "请选择操作 [0-10/q]: " choice
+        read -p "请选择操作 [0-11/q]: " choice
 
         case $choice in
             1) update_system; press_enter ;;
             2) set_timezone; press_enter ;;
-            3) configure_swap; press_enter ;;
-            4) create_user; press_enter ;;
-            5) configure_ssh; press_enter ;;
-            6) configure_ufw; press_enter ;;
-            7) install_fail2ban; press_enter ;;
-            8) enable_bbr; press_enter ;;
-            9) install_basic_tools; press_enter ;;
-            10) install_docker; press_enter ;;
+            3) set_hostname; press_enter ;;
+            4) configure_swap; press_enter ;;
+            5) create_user; press_enter ;;
+            6) configure_ssh; press_enter ;;
+            7) configure_ufw; press_enter ;;
+            8) install_fail2ban; press_enter ;;
+            9) enable_bbr; press_enter ;;
+            10) install_basic_tools; press_enter ;;
+            11) install_docker; press_enter ;;
             0) run_all; press_enter ;;
             q|Q) log "退出脚本"; exit 0 ;;
             *) error "无效选项"; press_enter ;;
