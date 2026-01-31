@@ -273,27 +273,51 @@ install_fail2ban() {
     local ssh_port=$(grep "^Port " /etc/ssh/sshd_config | awk '{print $2}')
     ssh_port=${ssh_port:-22}
 
+    # 检测防火墙后端
+    local ban_action="ufw"
+    if command -v nft &>/dev/null; then
+        ban_action="nftables-multiport"
+        log "检测到 nftables，使用 nftables 作为封禁后端"
+    elif command -v ufw &>/dev/null; then
+        ban_action="ufw"
+        log "使用 UFW 作为封禁后端"
+    fi
+
     # 创建本地配置
     cat > /etc/fail2ban/jail.local << EOF
 [DEFAULT]
-bantime = 1h
+# 忽略本机地址，防止误封自己
+ignoreip = 127.0.0.1/8 ::1
+
+# 封禁 1 天
+bantime  = 1d
+
+# 在 10 分钟内累计失败即触发
 findtime = 10m
-maxretry = 5
-banaction = ufw
+
+# 触发封禁的失败次数阈值
+maxretry = 3
+
+# 防火墙后端
+banaction = $ban_action
+banaction_allports = ${ban_action/multiport/allports}
 
 [sshd]
-enabled = true
-port = $ssh_port
-filter = sshd
-logpath = /var/log/auth.log
-maxretry = 3
+enabled  = true
+port     = $ssh_port
+backend  = systemd
+mode     = aggressive
 EOF
 
     systemctl enable fail2ban
     systemctl restart fail2ban
 
+    # 等待服务完全启动
+    sleep 2
+
     log "Fail2ban 配置完成"
     fail2ban-client status
+    fail2ban-client status sshd
 }
 
 #===============================================================================
