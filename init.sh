@@ -425,6 +425,8 @@ install_docker() {
     if command -v docker &>/dev/null; then
         warn "Docker 已安装"
         docker --version
+        # 已安装也询问是否添加用户到 docker 组
+        add_user_to_docker_group
         return
     fi
 
