@@ -382,6 +382,39 @@ install_basic_tools() {
 }
 
 #===============================================================================
+# 辅助函数: 添加用户到 docker 组
+#===============================================================================
+
+add_user_to_docker_group() {
+    # 列出可用的普通用户
+    local users=$(awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd)
+
+    if [[ -z "$users" ]]; then
+        warn "未找到普通用户，跳过 docker 组配置"
+        return
+    fi
+
+    echo "可用的用户："
+    echo "$users" | nl
+
+    read -p "请输入要加入 docker 组的用户名 (直接回车跳过): " docker_user
+
+    if [[ -z "$docker_user" ]]; then
+        log "跳过 docker 组配置"
+        return
+    fi
+
+    if ! id "$docker_user" &>/dev/null; then
+        error "用户 $docker_user 不存在"
+        return 1
+    fi
+
+    usermod -aG docker "$docker_user"
+    log "已将用户 $docker_user 添加到 docker 组"
+    warn "用户需要重新登录后才能免 sudo 使用 docker"
+}
+
+#===============================================================================
 # 模块10: Docker 安装
 #===============================================================================
 
@@ -417,11 +450,8 @@ install_docker() {
     systemctl enable docker
     systemctl start docker
 
-    # 添加当前用户到 docker 组（如果不是 root）
-    if [[ -n "$SUDO_USER" ]]; then
-        usermod -aG docker "$SUDO_USER"
-        log "已将用户 $SUDO_USER 添加到 docker 组"
-    fi
+    # 添加用户到 docker 组
+    add_user_to_docker_group
 
     log "Docker 安装完成"
     docker --version
